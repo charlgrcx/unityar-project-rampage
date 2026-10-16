@@ -57,27 +57,39 @@ public static class GoBagData
             "Pack spare batteries. It is safer than candles."),
     };
 
+    // EARTHQUAKE QUIZ: one question about using each essential after an earthquake.
     // Each question needs exactly 4 options. 'answer' is the position of the
     // correct option: 0 = first, 1 = second, 2 = third, 3 = fourth.
     public static readonly Question[] Quiz =
     {
-        new Question("Why should you pack a spare change of clothes?",
-            new[] { "It looks neat", "To stay dry and warm and avoid getting sick", "It makes the bag lighter", "To signal rescuers" }, 1,
-            "Wet or cold clothes can lead to hypothermia and illness."),
-        new Question("Why keep a first-aid kit in your go-bag?",
-            new[] { "To treat injuries right away while waiting for help", "To make the bag heavier", "To replace drinking water", "To signal rescuers" }, 0,
-            "Quick treatment stops injuries from getting worse or infected."),
-        new Question("Why pack face masks?",
-            new[] { "To keep food warm", "To filter dust and smoke in the air", "To light the way at night", "To call for help" }, 1,
-            "Masks help protect your lungs when the air is polluted."),
-        new Question("How much drinking water should you plan per person, per day?",
-            new[] { "About 0.5 liter", "About 1 liter", "About 4 liters (1 gallon)", "About 10 liters" }, 2,
-            "Roughly 4 liters covers drinking and basic hygiene."),
-        new Question("Why is a whistle better than shouting for help?",
-            new[] { "It is louder, travels farther and does not tire you out", "It plays music", "It boils water", "It scares away every danger" }, 0,
-            "Three blasts signal distress and save your energy."),
-        new Question("Why is a flashlight better than a candle in a blackout?",
-            new[] { "It is cheaper", "It has no open flame or fire risk", "It never needs batteries", "It is always brighter" }, 1,
-            "Candles can start fires. LED flashlights are much safer."),
+        // clothes
+        new Question("After an earthquake you wait outside and it starts to rain. How does your spare set of clothes help?",
+            new[] { "It makes the bag lighter", "It keeps you dry and warm so you do not get sick", "It stops the ground from shaking", "It calls the rescuers" }, 1,
+            "Wet, cold clothes can make you sick. Dry clothes keep your body warm."),
+
+        // first-aid kit
+        new Question("The shaking stops and your friend has a small cut from broken glass. Which essential should you use?",
+            new[] { "The whistle", "The face mask", "The first-aid kit", "The flashlight" }, 2,
+            "A first-aid kit has bandages to clean and cover cuts. Always tell a grown-up too!"),
+
+        // face mask
+        new Question("After an earthquake, dust from broken walls fills the air. What should you do with your face mask?",
+            new[] { "Wear it over your nose and mouth", "Use it as a pillow", "Hang it on your bag", "Save it for later" }, 0,
+            "A mask filters dust so you can breathe safer and protect your lungs."),
+
+        // water bottle
+        new Question("An earthquake breaks the water pipes, and tap water may not be safe. Why do you need your water bottle?",
+            new[] { "To wash the floor", "To make the shaking stop", "To water the plants", "To have safe water to drink" }, 3,
+            "People need safe drinking water every day. Plan about 4 liters per person per day."),
+
+        // whistle
+        new Question("You are stuck behind a fallen cabinet and nobody can see you. How do you use your whistle?",
+            new[] { "Blow a happy song", "Blow it in 3 loud blasts to call for help", "Throw it far away", "Hide it in your pocket" }, 1,
+            "Three blasts is the signal for help. A whistle is louder than shouting and does not tire you out."),
+
+        // flashlight
+        new Question("An earthquake cuts the power at night. Why is a flashlight better than a candle?",
+            new[] { "It has no flame, so it cannot start a fire", "It is hotter than a candle", "It makes a loud noise", "It uses water" }, 0,
+            "After an earthquake there may be a gas leak. A flame could start a fire, so use a flashlight."),
     };
 }

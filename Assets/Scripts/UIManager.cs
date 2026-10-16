@@ -37,18 +37,18 @@ public class UIManager : MonoBehaviour
     GameManager gm;
     MarkerSpawner spawner;
     TMP_FontAsset headFont, bodyFont;
-    Sprite roundSprite, outlineSprite, circleSprite;
+    Sprite roundSprite, outlineSprite, circleSprite, ringSprite;
     Transform root;
     RectTransform overlay;
 
     GameObject startPanel, preparePanel, hudPanel, infoCard, quizPanel, resultPanel, toastBox, hintBox, feedbackBox;
     TextMeshProUGUI progressText, pointsText, toastText, hintText, infoTitle, infoBody, infoTip, infoPts,
-        quizHeader, quizPoints, quizQuestion, quizFeedback, resultText, quizBtnLabel, nextLabel, floatText;
+        quizHeader, quizPoints, quizQuestion, quizFeedback, nextLabel, floatText, chooserBottomLabel, resultScore, resultOutOf, resultRank;
     Image infoPtsBox, scanFrame;
     Image[] slots;
     RectTransform cardRect, floatRect;
     CanvasGroup floatGroup;
-    Button quizBtn, nextButton;
+    Button nextButton;
     Button[] optionButtons = new Button[4];
     TextMeshProUGUI[] optionTexts = new TextMeshProUGUI[4];
 
@@ -58,6 +58,26 @@ public class UIManager : MonoBehaviour
     Vector2 cardMin, cardMax;
     int qIndex; bool answered;
     float toastTimer, cardT = 1f, floatT = 1f;
+
+    // item chooser (the "open the bag" panel) and the bar with Turn / Zoom
+    static readonly Color FoundTint = Color.Lerp(Olive, Cream, 0.7f);
+    RectTransform chooserRect;
+    GameObject viewBar;
+    Image[] chooserBg;
+    TextMeshProUGUI[] chooserName;
+    GameObject[] chooserFound;
+    Vector2 chooserMin, chooserMax;
+    bool chooserOpen;
+    float chooserT = 1f;
+    public bool ChooserOpen { get { return chooserOpen; } }
+
+    // summary screen
+    static readonly string[] BadgeTitles = { "First Find", "Explorer", "Quiz Ace", "Go-Bag Master" };
+    static readonly string[] BadgeDescs = { "Found your first item", "Found every item", "Perfect quiz score", "90% or more" };
+    Image ringFill;
+    float ringShown;
+    TextMeshProUGUI[] statValue, badgeText;
+    Image[] badgeBg;
 
     static Color Hex(string h) { ColorUtility.TryParseHtmlString(h, out var c); return c; }
     static Color A(Color c, float a) { return new Color(c.r, c.g, c.b, a); }
@@ -79,7 +99,9 @@ public class UIManager : MonoBehaviour
         roundSprite = MakeSprite(128, 48f, 0f, true);
         outlineSprite = MakeSprite(128, 48f, 8f, true);
         circleSprite = MakeSprite(128, 64f, 0f, false);
+        ringSprite = MakeSprite(128, 64f, 16f, false);
 
+        ItemLibrary.PrepareThumbnails();     // pictures of the 3D models for the item buttons
         EnsureEventSystem();
         BuildCanvas();
         gm.Changed += Refresh;
@@ -257,7 +279,7 @@ public class UIManager : MonoBehaviour
 
         // things that float above every screen
         overlay = Safe(root);
-        BuildInfoCard(); BuildToast(); BuildFloat();
+        BuildInfoCard(); BuildChooser(); BuildToast(); BuildFloat();
 
         ApplySafe();
     }
@@ -266,26 +288,29 @@ public class UIManager : MonoBehaviour
     void BuildStart()
     {
         startPanel = Container("Start");
-        Fill(startPanel.transform, Cream, 0, 0, 1, 1);
-        Blob(startPanel.transform, Coral, 1f, 1f, 560);
-        Blob(startPanel.transform, Peach, 0f, 0f, 520);
+        // green top, with a big peach dome rising from the bottom
+        Fill(startPanel.transform, Olive, 0, 0, 1, 1);
+        Blob(startPanel.transform, A(Cream, 0.10f), 0f, 1f, 640f, 60f, -60f);   // soft light bubbles on the green
+        Blob(startPanel.transform, A(Cream, 0.10f), 1f, 0.62f, 360f, 120f, 0f);
+        Blob(startPanel.transform, Peach, 0.5f, 0f, 2000f);                      // the peach dome
+        Blob(startPanel.transform, Coral, 1f, 0f, 420f, 90f, -90f);              // coral accent in the corner
         var s = Safe(startPanel.transform);
 
-        Txt(s, "GO-BAG", 130, TextAlignmentOptions.Center, Olive, 0.05f, 0.80f, 0.95f, 0.93f, true);
-        var pill = Card(s, Coral, 0.28f, 0.745f, 0.72f, 0.80f, false);
+        Txt(s, "GO-BAG", 130, TextAlignmentOptions.Center, Cream, 0.05f, 0.80f, 0.95f, 0.93f, true);
+        var pill = Card(s, Peach, 0.28f, 0.745f, 0.72f, 0.80f, false);
         Txt(pill.transform, "ESSENTIALS", 40, TextAlignmentOptions.Center, Ink, 0.05f, 0.05f, 0.95f, 0.95f, true);
-        Txt(s, "Find all 6 things to pack in an emergency bag!", 40, TextAlignmentOptions.Center, Ink, 0.08f, 0.665f, 0.92f, 0.735f, true);
+        Txt(s, "Find all 6 things to pack in an emergency bag!", 40, TextAlignmentOptions.Center, Cream, 0.08f, 0.665f, 0.92f, 0.735f, true);
 
         StepRow(s.transform, 1, "Tap START and point your camera at the Go-Bag marker.", 0.52f, 0.65f);
-        StepRow(s.transform, 2, "Tap the items to learn about them (+10 points). Use the buttons to turn, zoom and change colors.", 0.365f, 0.505f);
-        StepRow(s.transform, 3, "Find all 6 items, then take the quiz (+20 points for each right answer).", 0.21f, 0.35f);
+        StepRow(s.transform, 2, "Tap the bag, pick an item and place it. Then tap the item to earn +10 points and learn about it!", 0.365f, 0.505f);
+        StepRow(s.transform, 3, "Find all 6 items, then take the earthquake quiz (+20 points for each right answer).", 0.21f, 0.35f);
 
-        Btn(s, "START!", 66, Coral, Ink, 0.2f, 0.065f, 0.8f, 0.175f, () => gm.SetStage(Stage.Prepare), out _);
+        Btn(s, "START!", 66, Olive, Cream, 0.2f, 0.065f, 0.8f, 0.175f, () => gm.SetStage(Stage.Prepare), out _);
     }
 
     void StepRow(Transform p, int n, string text, float y0, float y1)
     {
-        var row = Card(p, A(Peach, 0.45f), 0.06f, y0, 0.94f, y1, false);
+        var row = Card(p, Cream, 0.06f, y0, 0.94f, y1, false);
         var num = Blob(row.transform, Coral, 0f, 0.5f, 110f, 80f, 0f);
         Txt(num.transform, n.ToString(), 60, TextAlignmentOptions.Center, Ink, 0f, 0f, 1f, 1f, true);
         Txt(row.transform, text, 36, TextAlignmentOptions.Left, Ink, 0.2f, 0.05f, 0.96f, 0.95f);
@@ -327,25 +352,28 @@ public class UIManager : MonoBehaviour
             slots[i] = Card(top.transform, SlotEmpty, 0.05f + step * i, 0.12f, 0.05f + step * (i + 1) - 0.02f, 0.4f, false);
 
         // hint pill
-        var hint = Card(s, A(Olive, 0.92f), 0.1f, 0.128f, 0.9f, 0.188f, false);
+        var hint = Card(s, A(Olive, 0.92f), 0.08f, 0.125f, 0.92f, 0.2f, false);
         hintBox = hint.gameObject;
         hintText = Txt(hint.transform, "", 34, TextAlignmentOptions.Center, Cream, 0.03f, 0.05f, 0.97f, 0.95f, true);
 
-        // bottom bar
+        // bottom bar: only shown while an item is out of the bag
         var bar = Card(s, A(Cream, 0.95f), 0.03f, 0.012f, 0.97f, 0.112f);
-        string[] labels = { "Turn\n<", "Turn\n>", "Zoom\n-", "Zoom\n+", "Color" };
+        viewBar = bar.gameObject;
+        string[] labels = { "Bag", "Turn\n<", "Turn\n>", "Zoom\n-", "Zoom\n+", "Info" };
         UnityAction[] acts =
         {
-            () => spawner.Product?.Rotate(-45f), () => spawner.Product?.Rotate(45f),
-            () => spawner.Product?.Zoom(0.8f),   () => spawner.Product?.Zoom(1.25f),
-            () => { if (spawner.Product != null) Toast("Bag color: " + spawner.Product.CycleColor()); }
+            OpenChooser,
+            () => spawner.Viewer.Rotate(-45f), () => spawner.Viewer.Rotate(45f),
+            () => spawner.Viewer.Zoom(0.8f),   () => spawner.Viewer.Zoom(1.25f),
+            ReopenInfo
         };
-        for (int i = 0; i < 5; i++)
+        for (int i = 0; i < 6; i++)
         {
-            float x0 = 0.02f + 0.128f * i;
-            Btn(bar.transform, labels[i], 32, i == 4 ? Coral : Peach, Ink, x0, 0.12f, x0 + 0.118f, 0.88f, acts[i], out _);
+            float x0 = 0.015f + 0.1625f * i;
+            Btn(bar.transform, labels[i], 32, i == 0 ? Olive : (i == 5 ? Coral : Peach), i == 0 ? Cream : Ink,
+                x0, 0.12f, x0 + 0.15f, 0.88f, acts[i], out _);
         }
-        quizBtn = Btn(bar.transform, "Quiz", 38, Olive, Cream, 0.68f, 0.12f, 0.98f, 0.88f, OnQuizButton, out quizBtnLabel);
+        viewBar.SetActive(false);
     }
 
     // Info card (slides up from the bottom)
@@ -398,16 +426,56 @@ public class UIManager : MonoBehaviour
     void BuildResult()
     {
         resultPanel = Container("Result");
-        Fill(resultPanel.transform, Cream, 0, 0, 1, 1);
-        Blob(resultPanel.transform, Coral, 1f, 1f, 560);
-        Blob(resultPanel.transform, Peach, 0f, 0f, 520);
+        // same look as the home screen: green top, peach dome at the bottom
+        Fill(resultPanel.transform, Olive, 0, 0, 1, 1);
+        Blob(resultPanel.transform, A(Cream, 0.10f), 0f, 1f, 640f, 60f, -60f);
+        Blob(resultPanel.transform, Peach, 0.5f, 0f, 1700f);
+        Blob(resultPanel.transform, Coral, 1f, 0f, 380f, 90f, -90f);
         var s = Safe(resultPanel.transform);
 
-        Txt(s, "MISSION\nCOMPLETE!", 90, TextAlignmentOptions.Center, Olive, 0.05f, 0.77f, 0.95f, 0.94f, true);
-        var card = Card(s, A(Cream, 0.97f), 0.06f, 0.3f, 0.94f, 0.76f, false);
-        resultText = Txt(card.transform, "", 42, TextAlignmentOptions.Top, Ink, 0.06f, 0.04f, 0.94f, 0.96f);
-        Btn(s, "Keep Exploring", 38, Olive, Cream, 0.06f, 0.15f, 0.49f, 0.26f, () => gm.SetStage(Stage.Interact), out _);
-        Btn(s, "Play Again", 38, Coral, Ink, 0.51f, 0.15f, 0.94f, 0.26f, () => gm.ResetGame(), out _);
+        Txt(s, "MISSION COMPLETE!", 84, TextAlignmentOptions.Center, Cream, 0.04f, 0.87f, 0.96f, 0.975f, true);
+
+        // score ring: fills up to your completion percent
+        Blob(s, Cream, 0.5f, 0.70f, 580f);
+        var track = Blob(s, A(Peach, 0.7f), 0.5f, 0.70f, 500f);
+        track.sprite = ringSprite;
+        ringFill = Blob(s, Coral, 0.5f, 0.70f, 500f);
+        ringFill.sprite = ringSprite;
+        ringFill.type = Image.Type.Filled;
+        ringFill.fillMethod = Image.FillMethod.Radial360;
+        ringFill.fillOrigin = (int)Image.Origin360.Top;
+        ringFill.fillClockwise = true;
+        resultScore = Txt(s, "", 130, TextAlignmentOptions.Center, Olive, 0.3f, 0.675f, 0.7f, 0.77f, true);
+        resultOutOf = Txt(s, "", 30, TextAlignmentOptions.Center, Ink, 0.3f, 0.635f, 0.7f, 0.68f);
+        resultRank = Txt(s, "", 66, TextAlignmentOptions.Center, Cream, 0.05f, 0.49f, 0.95f, 0.565f, true);
+
+        // three little stat cards
+        string[] statNames = { "Items found", "Quiz score", "Complete" };
+        statValue = new TextMeshProUGUI[3];
+        for (int i = 0; i < 3; i++)
+        {
+            float x0 = 0.06f + i * 0.31f;
+            var chip = Card(s, Cream, x0, 0.385f, x0 + 0.26f, 0.485f, false);
+            statValue[i] = Txt(chip.transform, "", 54, TextAlignmentOptions.Center, Olive, 0.05f, 0.40f, 0.95f, 0.95f, true);
+            Txt(chip.transform, statNames[i], 26, TextAlignmentOptions.Center, Ink, 0.05f, 0.06f, 0.95f, 0.42f);
+        }
+
+        // badges: earned ones are coral, the others are faded
+        var bc = Card(s, Cream, 0.06f, 0.195f, 0.94f, 0.37f, false);
+        Txt(bc.transform, "Badges", 34, TextAlignmentOptions.Left, Olive, 0.05f, 0.80f, 0.5f, 0.98f, true);
+        badgeBg = new Image[BadgeTitles.Length];
+        badgeText = new TextMeshProUGUI[BadgeTitles.Length];
+        for (int i = 0; i < BadgeTitles.Length; i++)
+        {
+            float x0 = 0.03f + (i % 2) * 0.485f;
+            float y1 = 0.77f - (i / 2) * 0.375f;
+            var pill = Card(bc.transform, Peach, x0, y1 - 0.35f, x0 + 0.455f, y1, false);
+            badgeBg[i] = pill;
+            badgeText[i] = Txt(pill.transform, "", 30, TextAlignmentOptions.Center, Ink, 0.04f, 0.04f, 0.96f, 0.96f, true);
+        }
+
+        Btn(s, "Keep Exploring", 38, Olive, Cream, 0.06f, 0.055f, 0.49f, 0.155f, () => gm.SetStage(Stage.Interact), out _);
+        Btn(s, "Play Again", 38, Cream, Ink, 0.51f, 0.055f, 0.94f, 0.155f, () => gm.ResetGame(), out _);
     }
 
     void BuildToast()
@@ -438,32 +506,42 @@ public class UIManager : MonoBehaviour
         Show(hudPanel, s == Stage.Interact);
         Show(quizPanel, s == Stage.Quiz);
         Show(resultPanel, s == Stage.Complete);
-        if (s != Stage.Interact) { infoCard.SetActive(false); ItemHotspot.PopNone(); }
+        if (s != Stage.Interact)
+        {
+            infoCard.SetActive(false);
+            chooserOpen = false; chooserRect.gameObject.SetActive(false);
+            if (spawner != null && spawner.Viewer != null) spawner.Viewer.Clear();
+        }
 
         progressText.text = "Found " + gm.FoundCount + "/" + gm.ItemCount;
         pointsText.text = gm.Points + " pts";
         for (int i = 0; i < slots.Length; i++) slots[i].color = gm.IsFound(i) ? Coral : SlotEmpty;
 
-        bool locked = !gm.AllFound && !gm.QuizDone;
-        quizBtn.image.color = locked ? A(Olive, 0.5f) : Olive;
-        quizBtnLabel.color = locked ? Ink : Cream;
-        quizBtnLabel.text = gm.QuizDone ? "Results" : (gm.AllFound ? "Quiz!" : "Quiz\n(locked)");
-
+        if (chooserOpen) RefreshChooser();
         UpdateHint();
         if (s == Stage.Complete) ShowResults();
     }
 
     void UpdateHint()
     {
-        if (hintBox == null || infoCard == null) return;
+        if (hintBox == null || infoCard == null || spawner == null) return;
         string msg = null;
-        if (!infoCard.activeSelf)
+        var v = spawner.Viewer;
+        if (gm.CurrentStage == Stage.Interact && !chooserOpen && !infoCard.activeSelf)
         {
-            if (!gm.AllFound) msg = "Tap an item to learn about it!";
-            else if (!gm.QuizDone) msg = "You found them all! Tap Quiz!";
+            if (v != null && v.Placing) msg = "Move your phone, then TAP the table to place it!";
+            else if (v != null && v.HasItem)
+            {
+                string nm = GoBagData.Items[v.Index].name;
+                msg = gm.IsFound(v.Index) ? "Tap the " + nm + " to read about it again!"
+                                          : "Tap the " + nm + " to earn points and see its info!";
+            }
+            else if (!gm.AllFound) msg = "Tap the go-bag to open it!";
+            else if (!gm.QuizDone) msg = "You found them all! Tap the bag for the quiz!";
+            else msg = "Tap the bag to look at the items again!";
         }
         hintBox.SetActive(msg != null);
-        if (msg != null) hintText.text = msg;
+        if (msg != null && hintText.text != msg) hintText.text = msg;
     }
 
     void HideCard()
@@ -473,10 +551,111 @@ public class UIManager : MonoBehaviour
         UpdateHint();
     }
 
-    public void ShowItem(int i)
+    // ---- item chooser: opens when the bag is tapped ----
+    void BuildChooser()
+    {
+        chooserRect = R("Chooser", overlay, 0.03f, 0.10f, 0.97f, 0.66f);
+        chooserMin = chooserRect.anchorMin; chooserMax = chooserRect.anchorMax;
+        Card(chooserRect, Cream, 0, 0, 1, 1);
+        Txt(chooserRect, "Open the Go-Bag!", 60, TextAlignmentOptions.Center, Olive, 0.05f, 0.87f, 0.95f, 0.98f, true);
+        Txt(chooserRect, "Pick an essential, then place it in AR.", 32, TextAlignmentOptions.Center, Ink, 0.05f, 0.80f, 0.95f, 0.87f);
+
+        int n = gm.ItemCount;
+        chooserBg = new Image[n]; chooserName = new TextMeshProUGUI[n]; chooserFound = new GameObject[n];
+        for (int i = 0; i < n; i++)
+        {
+            int idx = i;
+            float x0 = 0.04f + (i % 3) * 0.315f;
+            float y1 = 0.79f - (i / 3) * 0.31f;
+            var b = Btn(chooserRect, GoBagData.Items[i].name, 34, Peach, Ink, x0, y1 - 0.29f, x0 + 0.29f, y1,
+                        () => PickItem(idx), out var label);
+            chooserBg[i] = b.image; chooserName[i] = label;
+            label.rectTransform.anchorMin = new Vector2(0.04f, 0.03f);     // name sits under the picture
+            label.rectTransform.anchorMax = new Vector2(0.96f, 0.27f);
+
+            var th = R("Thumb", b.transform, 0.08f, 0.29f, 0.92f, 0.96f).gameObject.AddComponent<Image>();
+            th.sprite = ItemLibrary.Thumbnail(i); th.preserveAspect = true; th.raycastTarget = false;
+
+            var fp = Card(b.transform, Coral, 0.40f, 0.85f, 0.97f, 0.98f, false);
+            Txt(fp.transform, "Found!", 24, TextAlignmentOptions.Center, Ink, 0.05f, 0.05f, 0.95f, 0.95f, true);
+            chooserFound[i] = fp.gameObject;
+        }
+        Btn(chooserRect, "Close", 44, Olive, Cream, 0.25f, 0.02f, 0.75f, 0.16f, OnChooserBottom, out chooserBottomLabel);
+        chooserRect.gameObject.SetActive(false);
+    }
+
+    void RefreshChooser()
+    {
+        for (int i = 0; i < chooserBg.Length; i++)
+        {
+            bool f = gm.IsFound(i);
+            chooserBg[i].color = f ? FoundTint : Peach;
+            chooserFound[i].SetActive(f);
+        }
+        chooserBottomLabel.text = gm.AllFound ? (gm.QuizDone ? "See Results" : "Take the Quiz!") : "Close";
+    }
+
+    public void OpenChooser()
+    {
+        if (gm.CurrentStage != Stage.Interact || spawner == null || spawner.Bag == null) return;
+        infoCard.SetActive(false);
+        spawner.Viewer.Clear();               // the item goes back into the bag
+        chooserOpen = true;
+        RefreshChooser();
+        chooserRect.gameObject.SetActive(true);
+        chooserT = 0f; Slide(chooserRect, chooserMin, chooserMax, 0f);
+        UpdateHint();
+    }
+
+    void CloseChooser()
+    {
+        chooserOpen = false;
+        chooserRect.gameObject.SetActive(false);
+        UpdateHint();
+    }
+
+    void OnChooserBottom()
+    {
+        if (gm.AllFound) OnQuizButton(); else CloseChooser();
+    }
+
+    void PickItem(int i)
+    {
+        CloseChooser();
+        infoCard.SetActive(false);
+        spawner.Viewer.Show(i, spawner.BagTransform, spawner.MarkerSize);   // hovers in AR until the player taps
+        UpdateHint();
+    }
+
+    static void Slide(RectTransform r, Vector2 min, Vector2 max, float t)
+    {
+        float e = 1f - Mathf.Pow(1f - t, 3f);
+        float shift = (1f - e) * -0.7f;
+        r.anchorMin = new Vector2(min.x, min.y + shift);
+        r.anchorMax = new Vector2(max.x, max.y + shift);
+    }
+
+    // ---- item info ----
+    /// <summary>Called when the player taps the item they placed in AR: awards points the first time and shows its info.</summary>
+    public void OnItemTapped(int i)
+    {
+        bool isNew = gm.Discover(i);
+        FillInfo(i, isNew);
+        if (isNew) Pop("+" + GoBagData.PointsPerItem + " pts");
+        if (isNew && gm.AllFound) Toast("All items found! Tap the bag to take the quiz.");
+    }
+
+    void ReopenInfo()
+    {
+        if (!spawner.Viewer.HasItem) return;
+        int i = spawner.Viewer.Index;
+        if (gm.IsFound(i)) FillInfo(i, false);
+        else Toast("Tap the item in AR to earn points and see its info!");
+    }
+
+    void FillInfo(int i, bool isNew)
     {
         var item = GoBagData.Items[i];
-        bool isNew = gm.Discover(i);
         infoTitle.text = item.name;
         infoBody.text = item.info;
         infoTip.text = "<color=" + HexOf(Olive) + ">Tip:</color> " + item.tip;
@@ -484,10 +663,7 @@ public class UIManager : MonoBehaviour
         infoPtsBox.color = isNew ? Coral : Peach;
         infoCard.SetActive(true);
         cardT = 0f; ApplyCard(0f);          // slide the card up
-        ItemHotspot.PopOnly(i);             // pop the 3D item
         UpdateHint();
-        if (isNew) Pop("+" + GoBagData.PointsPerItem + " pts");
-        if (isNew && gm.AllFound) Toast("All items found! The quiz is unlocked.");
     }
 
     void OnQuizButton()
@@ -547,14 +723,22 @@ public class UIManager : MonoBehaviour
 
     void ShowResults()
     {
-        string green = HexOf(Olive);
-        string s = "<size=130%><color=" + green + ">" + gm.Rank + "</color></size>\n\n" +
-                   "Score: " + gm.Points + " / " + gm.MaxPoints +
-                   "\nItems found: " + gm.FoundCount + "/" + gm.ItemCount +
-                   "\nQuiz: " + gm.QuizCorrect + "/" + GoBagData.Quiz.Length +
-                   "\n\n<color=" + green + ">Badges</color>";
-        foreach (var a in gm.Achievements()) s += "\n- " + a;
-        resultText.text = s;
+        ringShown = 0f;                                   // the ring fills up from empty (see Update)
+        resultScore.text = gm.Points.ToString();
+        resultOutOf.text = "out of " + gm.MaxPoints + " points";
+        resultRank.text = gm.Rank;
+        statValue[0].text = gm.FoundCount + "/" + gm.ItemCount;
+        statValue[1].text = gm.QuizCorrect + "/" + GoBagData.Quiz.Length;
+        statValue[2].text = Mathf.RoundToInt(gm.Percent * 100f) + "%";
+
+        var earned = gm.Achievements();
+        for (int i = 0; i < BadgeTitles.Length; i++)
+        {
+            bool got = earned.Exists(a => a.StartsWith(BadgeTitles[i]));
+            badgeBg[i].color = got ? Coral : A(Peach, 0.35f);
+            badgeText[i].color = got ? Ink : A(Ink, 0.5f);
+            badgeText[i].text = BadgeTitles[i] + "\n<size=72%>" + (got ? BadgeDescs[i] : "Not yet!") + "</size>";
+        }
     }
 
     void Toast(string msg) { toastText.text = msg; toastBox.SetActive(true); toastTimer = 2.5f; }
@@ -590,6 +774,17 @@ public class UIManager : MonoBehaviour
             ApplyCard(cardT);
         }
 
+        if (chooserT < 1f)
+        {
+            chooserT = Mathf.Min(1f, chooserT + Time.deltaTime * 3.5f);
+            Slide(chooserRect, chooserMin, chooserMax, chooserT);
+        }
+
+        // the Turn / Zoom bar only shows while an item is out of the bag
+        bool showBar = gm.CurrentStage == Stage.Interact && !chooserOpen && spawner != null && spawner.Viewer != null && spawner.Viewer.HasItem;
+        if (viewBar.activeSelf != showBar) viewBar.SetActive(showBar);
+        if (hudPanel.activeSelf) UpdateHint();
+
         if (floatRect.gameObject.activeSelf)
         {
             floatT += Time.deltaTime / 1.2f;
@@ -602,6 +797,13 @@ public class UIManager : MonoBehaviour
         foreach (var cg in fades)
             if (cg.gameObject.activeInHierarchy && cg.alpha < 1f)
                 cg.alpha = Mathf.MoveTowards(cg.alpha, 1f, Time.deltaTime * 5f);
+
+        // the score ring fills up on the summary screen
+        if (resultPanel.activeSelf && ringFill != null)
+        {
+            ringShown = Mathf.MoveTowards(ringShown, gm.Percent, Time.deltaTime * 0.6f);
+            ringFill.fillAmount = ringShown;
+        }
 
         // pulsing aim frame while waiting for the marker
         if (preparePanel.activeSelf)
