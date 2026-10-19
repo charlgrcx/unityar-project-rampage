@@ -89,8 +89,7 @@ public class MarkerSpawner : MonoBehaviour
     {
         if (Bag != null)
         {
-            Bag.gameObject.SetActive(markerSeen && gm.CurrentStage != Stage.Start);
-            Bag.Invite = !ui.ChooserOpen && !Viewer.HasItem;     // wiggle only when there is nothing else to do
+            Bag.gameObject.SetActive(markerSeen && gm.CurrentStage != Stage.Start && !Viewer.HasItem); Bag.Invite = !ui.ChooserOpen && !Viewer.HasItem;     // wiggle only when there is nothing else to do
             Viewer.Invite = Viewer.HasItem && !gm.IsFound(Viewer.Index);   // the item pulses until it has been tapped
         }
 

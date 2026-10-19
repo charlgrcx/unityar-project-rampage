@@ -51,7 +51,6 @@ public static class ItemLibrary
         if (thumbs[i] != null) return thumbs[i];
 
         var model = CreateItem(i, 1f);
-        model.transform.position = new Vector3(0f, -5000f, 0f);   // far away from everything else
         SetLayer(model, PreviewLayer);
 
         var camGo = new GameObject("ThumbnailCamera");
@@ -83,8 +82,8 @@ public static class ItemLibrary
 
         cam.targetTexture = null;
         RenderTexture.ReleaseTemporary(rt);
-        Object.Destroy(camGo);
-        Object.Destroy(model);
+        Object.DestroyImmediate(camGo);
+        Object.DestroyImmediate(model);
 
         thumbs[i] = Sprite.Create(tex, new Rect(0, 0, ThumbSize, ThumbSize), new Vector2(0.5f, 0.5f));
         return thumbs[i];

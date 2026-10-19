@@ -359,7 +359,7 @@ public class UIManager : MonoBehaviour
         // bottom bar: only shown while an item is out of the bag
         var bar = Card(s, A(Cream, 0.95f), 0.03f, 0.012f, 0.97f, 0.112f);
         viewBar = bar.gameObject;
-        string[] labels = { "Bag", "Turn\n<", "Turn\n>", "Zoom\n-", "Zoom\n+", "Info" };
+        string[] labels = { "< Back", "Turn\n<", "Turn\n>", "Zoom\n-", "Zoom\n+", "Info" };
         UnityAction[] acts =
         {
             OpenChooser,
